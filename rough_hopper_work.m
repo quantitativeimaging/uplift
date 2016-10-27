@@ -21,7 +21,7 @@ imRaw2 = imread('test_stack.tif',2);
                               input_points, base_points, 'Wait',true);
                                    
 figure(2)
-imagesc(imRaw2)
+imshow(imRaw2)
 hold on
 scatter(base_points(:,1), base_points(:,2), 'c')
 scatter(input_points(:,1), input_points(:,2), 'r')
