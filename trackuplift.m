@@ -9,11 +9,15 @@
 % 2. The camera pointing direction seems to drift during aquisition, 
 %    which introduced a constant translation. Needs immobilising. 
 %    Or use a fiducial mark to counter drift - although less ideal.
-
+%
+% 3. Remove red lines on glass. These create detections at thfrac=0.4
 
 addpath([pwd,'/tracking']);
 
-thfrac = 0.70;
+thfrac = 0.50;
+
+flagBGgs = 1;
+radgauss = 20;
 
 % 1. Input
 
@@ -23,23 +27,27 @@ numFrames = v.Duration.*v.FrameRate;
 
 pos = [];
 % listThresh =[];
+v.CurrentTime = 20;
 lpIm = 0;
-while lpIm < 25 %hasFrame(v)
+while lpIm < 12 %hasFrame(v)
 lpIm = lpIm + 1;
 
-v.CurrentTime = lpIm*2;
+v.CurrentTime = 20 + lpIm*2;
 
 imDat = readFrame(v); % skip a few frames ahead
 
 % Select a region containing only particles
-% select the red channel so the lines on the glass are fainter
-imROI = imDat(330:(330+689), 370:(370+759) , 1); 
+% Try finding mean grey level (could use red channel)
+imROI = mean( imDat(330:(330+689), 370:(370+759), :), 3); 
+% imagesc(imROI)
 
-figure(3)
-imagesc(imROI)
-
-im1 = 255-imROI;
-
+if(flagBGgs)
+  imBG = imgaussfilt(imROI, radgauss);
+  im1 = double(imBG) - double(imROI);
+else
+  im1 = 255-imROI;
+end
+    
 figure(4)
 imagesc(im1)
 
@@ -55,6 +63,7 @@ pk = pkfnd(im2,thresh,11);
 
 figure(5)
 imagesc(im2)
+colormap('gray')
 hold on
  scatter(pk(:,1),pk(:,2), 'r')
 hold off
@@ -74,9 +83,14 @@ res = track(pos,6);
 % plot
 figure(3)
 imagesc(imROI)
+colormap('gray')
 hold on
  for lpT = 1:res(end,4)
- plot(res(res(:,4)==lpT,1),res(res(:,4)==lpT,2) ,'r')
+  resA = res(res(:,4)==lpT,:);
+  plot(resA(:,1),resA(:,2) ,'r');
+  scatter(resA(1,1), resA(1,2), 'c');
+  scatter(resA(end,1), resA(end,2), 'r');
  end
+ legend('track','start','end')
 hold off
 
