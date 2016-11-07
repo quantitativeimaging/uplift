@@ -11,6 +11,13 @@
 %    Or use a fiducial mark to counter drift - although less ideal.
 %
 % 3. Remove red lines on glass. These create detections at thfrac=0.4
+% 
+% 4. Note vertical stretch in image - measure graph paper to identify
+%    this ratio (1.29 in some sample data), due to non-horizontal optic
+%    axis, most likely.
+%    2016/11/7: included YXratio to 'correct for' this - calculated
+%    displacements in listDisps are now in 'horizontal pixel widths'
+%
 
 addpath([pwd,'/tracking']);
 
@@ -19,6 +26,11 @@ thfrac = 0.50;
 flagBGgs = 1;
 radgauss = 20;
 
+YXratio = 1.29; % From image data, how many vertical pixel widths equal one
+                % horizontal width. Should be 1.00 if camera axis
+                % horizontal, but in practice it may vary! Calibrate. 
+hScale  = 40/149 ;   % mm per horizontal pixel width
+                
 % 1. Input
 
 v = VideoReader('Exp1.MP4');
@@ -141,7 +153,8 @@ listYinit = YY(:);
 
 [listXfinal, listYfinal] = tforminv(mytform, listXinit, listYinit);
 
-listDisps = sqrt((listXfinal - listXinit).^2 + (listYfinal - listYinit).^2);
+listDisps = sqrt((listXfinal - listXinit).^2 +...
+            ((listYfinal - listYinit)/YXratio).^2); % YXratio for vstretch
 matrDisps = reshape(listDisps, size(XX));
 
 figure(11)
@@ -176,3 +189,41 @@ xlabel('X position, pixels', 'fontSize', 14)
 ylabel('Y position, pixels', 'fontSize', 14)
 zlabel('speed, pixel per 9 frames', 'fontSize', 14)
 set(gca, 'fontSize', 12)
+
+% % Next section of analysis - threshold the displacement field. 
+% Try overlaying thresholded slip field to identiy regions where
+% speed exceeds some specific value
+% First calculate displacement field at 1:1 scale
+[XX,YY] = meshgrid([100:1:600], [100:1:600]);
+listXinit = XX(:);
+listYinit = YY(:);
+[listXfinal, listYfinal] = tforminv(mytform, listXinit, listYinit);
+listDisps = sqrt((listXfinal - listXinit).^2 +...
+            ((listYfinal - listYinit)/YXratio).^2); % YXratio for vstretch
+matrDisps = reshape(listDisps, size(XX));
+
+figure(15)
+maskSlip = (matrDisps>1);
+imagesc(maskSlip)
+
+imOverlay = double(imDat)/255;
+imOverlay(430:(430+500), 470:(470+500),2) = ...
+    0.5*(imOverlay(430:(430+500), 470:(470+500),2)) + 0.5*double(maskSlip);
+figure(16)
+imagesc(imOverlay)
+
+figure(17)
+plot(listXinit(listYinit==500)*hScale, listDisps(listYinit==500)*hScale,...
+     'b','lineWidth', 2);
+hold on
+  plot(listXinit(listYinit==100)*hScale, listDisps(listYinit==100)*hScale,...
+       'r', 'lineWidth', 2);
+  
+  plot([(560-370), (560-370)]*hScale, [0,4], 'k--', 'lineWidth', 1)
+  plot([(795-370), (795-370)]*hScale, [0,4], 'k--', 'lineWidth', 1)
+hold off
+legend('Near base','Near top', 'Plate edges')
+set(gca,'fontSize', 14)
+xlabel('Horizontal position / mm')
+ylabel('Displacement during 18 seconds / mm')
+grid on
