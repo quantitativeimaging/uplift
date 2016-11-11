@@ -1,9 +1,12 @@
 % timeresolved_distortion
 % EJR 2016, CC-BY
 %
-% Generates a map showing final state of an initially-square grid
+% NOTES
+% -Generates a map showing final state of an initially-square grid
+%
+% -Also tries to calculate area strain at each (non-edge) vertex of mesh
 
-outDirO = '\outVidM\';
+outName = 'D:\EJR_GIT\reverse_hopper\outVidM\mesh'; % File for output
 
 framesPerSlice = 5;
 nSlices = floor( nSteps / framesPerSlice ) ;
@@ -34,7 +37,7 @@ for lpSlice = 1:nSlices
   posDisp(invalid,:) = [];
   
   
-  % Identify current displacement field in this slice
+  % Identify current displacement field at end of this slice
   % ---------------------------- CP 2 TFORM
   mytform = cp2tform(posDisp, posInit, 'lwm');
   % 'piecewise linear' is stricter than local weighted mean 'lwm'
@@ -70,9 +73,55 @@ for lpSlice = 1:nSlices
   ylim([0 600])
   drawnow()
   
-  
+  % Capture and save the distored mesh
   myFrame = getframe(gcf);
   myFrDat = myFrame.cdata;
-  imwrite(myFrDat, ['D:\EJR_GIT\reverse_hopper\outVidM\mesh',int2str(lpSlice),'.png']);
+  imwrite(myFrDat, [outName,int2str(lpSlice),'.png']);
 
+  % Try to calculate area strain at each vertex of current mesh
+  % (a) Evaluate two current displacement vectors at each vertex, 
+  %      for vectors that were initially 'right' and 'down' in start grid
+  %      size = (rows, cols, 2) - add third direction (Dz = 0) for 'cross'
+  vectH = -ones([size(XXfinal),3]); % Residual -ones should be ignored
+  vectH(1:end,(1:end-1),1) = XXfinal(1:end,2:end)-XXfinal(1:end,(1:end-1));
+  vectH(1:end,(1:end-1),2) = YYfinal(1:end,2:end)-YYfinal(1:end,(1:end-1));
+  vectH(:,:,3) = 0; % Rel. displacement in z-direction is taken to be zero
+  % Apply pixel width to get physical displacements
+  vectH(:,:,1) = vectH(:,:,1)*scaleX;
+  vectH(:,:,2) = vectH(:,:,2)*scaleY;
+   
+  vectV = -ones([size(YYfinal),3]);
+  vectV(1:(end-1),1:end,1) = XXfinal(2:end,1:end)-XXfinal(1:(end-1),1:end);
+  vectV(1:(end-1),1:end,2) = YYfinal(2:end,1:end)-YYfinal(1:(end-1),1:end);
+  vectV(:,:,3) = 0;
+  % Apply pixel width scale to get physical displacements
+  vectV(:,:,1) = vectV(:,:,1)*scaleX;
+  vectV(:,:,2) = vectV(:,:,2)*scaleY;
+  
+  % Calculate areas of elements
+  vectAreas = abs(cross(vectH,vectV,3));
+  AA = vectAreas(:,:,3);
+  
+  matrArea = zeros(size(XXfinal));
+  matrArea(2:(end-1),2:(end-1)) = 0.5.*( AA(2:(end-1),2:(end-1) ) + ...
+                                        AA(1:(end-2),1:(end-2)) + ...
+                                        AA(1:(end-2),2:(end-1)    ) + ... 
+                                        AA(2:(end-1),1:(end-2)) );
+  if(lpSlice ==1)
+    matrAreaInit = matrArea;
+  end
+                                    
+  figure(21)
+  % imagesc(matrArea(2:(end-1),2:(end-1)))
+  imagesc(matrArea(2:(end-1),2:(end-1))./matrAreaInit(2:(end-1),2:(end-1)))
+  % view([180 90 ])
+  caxis([0.9 1.1])
+  colorbar
+   title(['Area strain of elements up to slice ',num2str(lpSlice)]);
+  axis equal
+  xlabel('X-position, grid points')
+  ylabel('Y-position, grid points')
+  set(gca, 'fontSize', 14)
+  
+  % Calculate aspect ratios of distorted elements
 end
