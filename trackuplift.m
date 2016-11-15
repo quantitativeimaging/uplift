@@ -202,6 +202,10 @@ listDisps = sqrt((listXfinal - listXinit).^2 +...
             ((listYfinal - listYinit)/YXratio).^2); % YXratio for vstretch
 matrDisps = reshape(listDisps, size(XX));
 
+% Get displacements separately in X- and Y-
+listDispX = listXfinal - listXinit;
+listDispY = (listYfinal - listYinit);
+
 figure(15)
 maskSlip = (matrDisps>1);
 imagesc(maskSlip)
@@ -227,3 +231,8 @@ set(gca,'fontSize', 14)
 xlabel('Horizontal position / mm')
 ylabel('Displacement during 18 seconds / mm')
 grid on
+
+% Try integrating speedss - change this to integrating vertical velocities
+figure(18)
+matrDispY = reshape(listDispY, size(YY));
+plot(-sum(matrDispY,2))

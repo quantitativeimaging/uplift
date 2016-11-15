@@ -79,11 +79,6 @@ threshMove = 0.025*nSteps; % Threshold for identifying movement.
                   % Is applied to dispacements in millimetres 
                   % Seems sensible to define as (speed X nSteps)
 
-roiXlist = 450:1070;
-roiYlist = 360:950;
-roiXplate = [272, 428];
-
-
 % 1. INPUT
 
 v = VideoReader(filenameMP4);
@@ -298,10 +293,10 @@ figure(15)
   ylabel('Y position, pixels', 'fontSize', 14)
 
 imOverlay = double(imDat)/255;
-imOverlay( roiRect(2)-1+[roiBorder:1:(roiRect(4)-roiBorder)], ...
-           roiRect(1)-1+[roiBorder:1:(roiRect(3)-roiBorder)],2) = ...
-    0.5*imOverlay( roiRect(2)-1+[roiBorder:1:(roiRect(4)-roiBorder)], ...
-                   roiRect(1)-1+[roiBorder:1:(roiRect(3)-roiBorder)],2)+...
+imOverlay( roiRect(2)-0+[roiBorder:1:(roiRect(4)-roiBorder)], ...
+           roiRect(1)-0+[roiBorder:1:(roiRect(3)-roiBorder)],2) = ...
+    0.5*imOverlay( roiRect(2)-0+[roiBorder:1:(roiRect(4)-roiBorder)], ...
+                   roiRect(1)-0+[roiBorder:1:(roiRect(3)-roiBorder)],2)+...
     0.5*double(maskSlip);
 figure(16)
 imagesc(imOverlay)

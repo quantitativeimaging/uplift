@@ -5,6 +5,10 @@
 % -Generates a map showing final state of an initially-square grid
 %
 % -Also tries to calculate area strain at each (non-edge) vertex of mesh
+%
+% - Then try to calculate potential energy for
+% -> gravitational potential (uplift)
+% -> volume expantion (try initially as: ideal gas?)
 
 outName = 'D:\EJR_GIT\reverse_hopper\outVidM\mesh'; % File for output
 
@@ -13,7 +17,14 @@ nSlices = floor( nSteps / framesPerSlice ) ;
 
 [XX,YY] = meshgrid([roiBorder:25:(roiRect(3)-roiBorder)], ...
                    [roiBorder:25:(roiRect(4)-roiBorder)]);
+
+% Array to store areas corresponding to non-boundary vertices in XX,YY
 arrayA = zeros([size(XX)-2,nSlices]);
+
+% Array to store estimated gravitational and strain energies
+arrayGPE = zeros(size(arrayA)); % Let slice 1 = zero for each element
+arrayEPE = zeros(size(arrayA)); % Let slice 1 = zero for each element
+
 
 for lpSlice = 1:nSlices
   frameStart = 1+(lpSlice-1)*framesPerSlice;
@@ -107,10 +118,11 @@ for lpSlice = 1:nSlices
   AA = vectAreas(:,:,3);
   
   matrArea = zeros(size(XXfinal));
-  matrArea(2:(end-1),2:(end-1)) = 0.5.*( AA(2:(end-1),2:(end-1) ) + ...
+  matrArea(2:(end-1),2:(end-1)) = 0.25.*( AA(2:(end-1),2:(end-1) ) + ...
                                         AA(1:(end-2),1:(end-2)) + ...
                                         AA(1:(end-2),2:(end-1)    ) + ... 
                                         AA(2:(end-1),1:(end-2)) );
+                                    % 0.25 gets area nearest each vertex?
   if(lpSlice ==1)
     matrAreaInit = matrArea;
   end
@@ -128,7 +140,17 @@ for lpSlice = 1:nSlices
   ylabel('Y-position, grid points')
   set(gca, 'fontSize', 14)
   
-  % Calculate aspect ratios of distorted elements
+  % Optional: calculate energies of the interpolated grid
+  volOfEle = 25*scaleX*25*scaleY*0.001*0.001*0.024;
+  arrayGPE(:,:,lpSlice) = -( YYfinal(2:(end-1),2:(end-1)) - YY(2:(end-1),2:(end-1)) )...
+                          * scaleY * 0.001 * 9.81 * 1800 * volOfEle; 
+         % mm per px * 0.001, g, 1800 kg/m^3, 24 mm depth, width
+         % negative as rows are counted downwards
+  arrayPre = YY(2:(end-1),2:(end-1)).*scaleY*0.001*9.81*1800;
+  arrayAst = arrayA(:,:,lpSlice)./arrayA(:,:,1) - 1;
+  arrayAst(arrayAst<0)=0;
+  arrayEPE(:,:,lpSlice) = volOfEle * arrayAst.*arrayPre;
+  
 end
 
 % Display (smoothed) area strain at the end of some time-slice
@@ -143,6 +165,15 @@ set(gca, 'fontSize', 14)
 colorbar
 title('(Smoothed) area strain... dilation in shear zone')
 
+% Try including the following in the loop:
 % Try integrating energy corresponding to uplift and expansion... 
-
+% Assume:
+%  Slice 1 has zero GPE (height energy) and EPE (strain) in each element
+%  Only calculate energy from increasing height (ignore falling)
+%  Only estimate energy from expansion Vs hydrostatic pressure ('ideal
+%  gas')
+%  Neglect energy of compressive strain, if there is any compression
+%  Try to neglect the 'flow around' region. (Small volume - may be OK.) 
+% arrayGPE = zeros(size(arrayA)); % Let slice 1 = zero for each element
+% arrayEPE = zeros(size(arrayA)); % Let slice 1 = zero for each element
   
