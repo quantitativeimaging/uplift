@@ -11,6 +11,10 @@ outName = 'D:\EJR_GIT\reverse_hopper\outVidM\mesh'; % File for output
 framesPerSlice = 5;
 nSlices = floor( nSteps / framesPerSlice ) ;
 
+[XX,YY] = meshgrid([roiBorder:25:(roiRect(3)-roiBorder)], ...
+                   [roiBorder:25:(roiRect(4)-roiBorder)]);
+arrayA = zeros([size(XX)-2,nSlices]);
+
 for lpSlice = 1:nSlices
   frameStart = 1+(lpSlice-1)*framesPerSlice;
   frameEnd   = lpSlice*framesPerSlice;
@@ -110,7 +114,8 @@ for lpSlice = 1:nSlices
   if(lpSlice ==1)
     matrAreaInit = matrArea;
   end
-                                    
+  arrayA(:,:,lpSlice) = matrArea(2:(end-1),2:(end-1));
+  
   figure(21)
   % imagesc(matrArea(2:(end-1),2:(end-1)))
   imagesc(matrArea(2:(end-1),2:(end-1))./matrAreaInit(2:(end-1),2:(end-1)))
@@ -125,3 +130,19 @@ for lpSlice = 1:nSlices
   
   % Calculate aspect ratios of distorted elements
 end
+
+% Display (smoothed) area strain at the end of some time-slice
+BB = arrayA(:,:,4)./arrayA(:,:,1); % area strain
+CC = imgaussfilt(BB-1, 1) +1; % slight smoothing - just for visualisation 
+figure(22)
+  imagesc(CC)
+  caxis([1 1.05])
+xlabel('X-position, grid points')
+ylabel('Y-position, grid points')
+set(gca, 'fontSize', 14)
+colorbar
+title('(Smoothed) area strain... dilation in shear zone')
+
+% Try integrating energy corresponding to uplift and expansion... 
+
+  
