@@ -209,12 +209,21 @@ listTEs  = listGPEs + listEPEs;
 
 listW1s = listGPEs(2:end) - listGPEs(1:(end-1));
 listW1s(listW1s<0) = 0; % assume any relaxation is wasted as heat
-listW2s = listEPEs(2:end) - listEPEs(1:(end-1));
+% listW2s = listEPEs(2:end) - listEPEs(1:(end-1));
+% alternative
+deltEPE =  arrayEPE(:,:,(2:end))-arrayEPE(:,:,1:(end-1));
+%deltEPE(deltEPE<0)=0; % make choice to integrate only +ve PdV work?
+                       % But this would sum up +ve values from noise
+listW2s = squeeze(sum(sum(deltEPE,1),2)) ;
 listW2s(listW2s<0) = 0; % assume any relaxation is wasted as heat
 listWs = listW1s + listW2s;
 
 % listDzs = ones(size(listZs));
 listDzs = listZs(2:end) - listZs(1:(end-1));
+
+% Alternative: for 42 s to 62 s in sample data: inspect pixel posit of plt:
+% listZplate=[5,5,5,5,5,6,7,8,9.5,11,13,15,18,20,22.5,25,28,31,34,37]'*scaleY*0.001
+% listDzs = listZplate(2:end) - listZplate(1:(end-1))
 
 listFs = listWs./listDzs ; % at 1.2 mm / 5s
 
