@@ -1,19 +1,51 @@
 % timeresolved_distortion
 % EJR 2016, CC-BY
 %
-% NOTES
-% -Generates a map showing final state of an initially-square grid
+% NOTES. This script:
+% 1. Post-processes particle tracking (velocimetry) results from
+% trackuplift_v2
 %
-% -Also tries to calculate area strain at each (non-edge) vertex of mesh
+% 2. Generates a map showing final state of an initially-square grid
 %
-% - Then try to calculate potential energy for
+% 3. Also tries to calculate area strain at each (non-edge) vertex of mesh
+%
+% 4. Then try to calculate potential energy for
 % -> gravitational potential (uplift)
 % -> volume expantion (try initially as: ideal gas?)
+%
+% 5. Also tries to calculate the shear rate (as a tensor?) for each area
+% element in the initial mesh
+%
+% 6. Hypothesis: area strain is proportional to shear rate, providing
+% enough info to make a Lagrange mechanics model of uplift assuming PdV
+% work and gravitational potential are the key factors. (Also: that area
+% strain is all vertical due to confinement.)
+% 
+% 7: Warning. Using zero border for mesh interpolation may fail due to lack
+% of well-tracked particles (moving outside ROI) at large time points.
+%
+% 8. Warning. Pressure interpolation is codged from grid size, and should 
+% be re-done with an exact initial position for the top of the ballotini.
+% Also, the grid spacing should be changed so that the entire area of 
+% distored material is always captured exactly. 
+%
+% 9. Try: particle tracking in larger ROI, with throw-away for tracks that
+%  start outside the area of ballotini in frame 1 (i.e. ignore air).
+%
+% 10. Try tracking video frames at 10 Hz and taking overlapping 1 sec
+% slices to get repeat estimates of area strain for checking / smoothing
+%
+% 11. Warning. Grid distortion measurement at 50 px (1/3 plate) is 
+% sensitive to x/y edges. Need small enough cells to capture plate edge,
+% but big enough to be free of Nyquist (?) like problems. 
 
 outName = 'D:\EJR_GIT\reverse_hopper\outVidM\mesh'; % File for output
 
-roiBorder = 0; % Unfortunately, strain is important at very grid bottom!
-gridSpacing = 50;
+roiBorder = 8; % Unfortunately, strain is important at very grid bottom!
+gridSpacing = 25;
+% gridSpacing = (roiRect(4)-2*roiBorder) /12; % Capture full vertical range
+
+initialHeight = 345; % Row in imDat corresponding to top of ballotini.
 
 framesPerSlice = 1;
 nSlices = 20;
@@ -25,6 +57,11 @@ nSlices = 20;
 % Array to store areas corresponding to non-boundary vertices in XX,YY
 arrayA = zeros([size(XX)-1,nSlices]);
 
+% Array of hydrostatic pressures estimated at centre of each 'square'
+arrayPre = ( roiRect(2) - initialHeight + gridSpacing/2 + ...
+            YY(1:(end-1),1:(end-1)) ).*scaleY*0.001*9.81*1800;
+
+
 % Array to store estimated gravitational and strain energies
 arrayGPE = zeros(size(arrayA)); % Let slice 1 = zero for each element
 arrayEPE = zeros(size(arrayA)); % Let slice 1 = zero for each element
@@ -33,6 +70,7 @@ listZs = zeros(nSlices, 1);
 for lpSlice = 1:nSlices
   frameStart = 1+(lpSlice-1)*framesPerSlice;
   frameEnd   = lpSlice*framesPerSlice;
+  frameMax   = nSlices*framesPerSlice;
     
   v.CurrentTime = tInit + (frameEnd-1)*tStep;  % Find frame at desired timepoint
   imDat = readFrame(v);                    % Read this frame
@@ -46,7 +84,8 @@ for lpSlice = 1:nSlices
   for lpTrack = 1:numTracks
     myCoords = res((res(:,4)==lpTrack),[1:4]);
     if( ((sum(myCoords(:,3)==1))+ ...
-         (sum(myCoords(:,3)==frameEnd))) == 2 )
+         (sum(myCoords(:,3)==frameEnd)) + ...
+         (sum(myCoords(:,3)==frameMax))) == 3 )
     posInit(lpTrack,:) = myCoords((myCoords(:,3)==1),1:2);
     posDisp(lpTrack,:) = myCoords((myCoords(:,3)==frameEnd),1:2);
     end
@@ -58,16 +97,24 @@ for lpSlice = 1:nSlices
   
   % Identify current displacement field at end of this slice
   % ---------------------------- CP 2 TFORM
-  mytform = cp2tform(posDisp, posInit, 'lwm');
+  % mytform = cp2tform(posDisp, posInit, 'lwm');
   % 'piecewise linear' is stricter than local weighted mean 'lwm'
-
-
+  % 2016-11-23: change to use fitgeotrans
+  %   Note n can be as small as 6, but risks ill-conditioning
+  %   In cp2tform, n defaults to 12. Higher values somewhat help to avoid
+  % bad extrapolations at grid edge.
+  n = 14;
+  mytform = fitgeotrans(posDisp,posInit,'lwm',n);
+  % mytform = fitgeotrans(posDisp,posInit,'pwl');
+  
   % Generate slip/static overlay image:
   [XX,YY] = meshgrid([roiBorder:gridSpacing:(roiRect(3)-roiBorder)], ...
                    [roiBorder:gridSpacing:(roiRect(4)-roiBorder)]);
   listXinit = XX(:);
   listYinit = YY(:);
-  [listXfinal, listYfinal] = tforminv(mytform, listXinit, listYinit);
+  % [listXfinal, listYfinal] = tforminv(mytform, listXinit, listYinit); %
+  % for co2tform based method
+  [listXfinal, listYfinal] = transformPointsInverse(mytform, listXinit, listYinit);
   listDisps = sqrt( (scaleX*(listXfinal - listXinit)).^2 +...
                     (scaleY*(listYfinal - listYinit)).^2); % In millimetres
   % matrDisps = reshape(listDisps, size(XX));
@@ -88,8 +135,8 @@ for lpSlice = 1:nSlices
   xlabel('X-position, pixels')
   ylabel('Y-position, pixels')
   set(gca, 'fontSize', 14)
-  xlim([0 700])
-  ylim([0 600])
+  xlim([-50 700])
+  ylim([-50 650])
   drawnow()
   
   % Capture and save the distored mesh
@@ -151,21 +198,28 @@ for lpSlice = 1:nSlices
                           * scaleY * 0.001 * 9.81 * 1800 * volOfEle; 
          % mm per px * 0.001, g, 1800 kg/m^3, 24 mm depth, width
          % negative as rows are counted downwards
-  arrayPre = (gridSpacing/2 + YY(1:(end-1),1:(end-1))).*scaleY*0.001*9.81*1800;
   arrayAst = arrayA(:,:,lpSlice)./arrayA(:,:,1) - 1;
   arrayAst(arrayAst<0)=0;
   arrayEPE(:,:,lpSlice) = volOfEle * arrayAst.*arrayPre;
   
   listZs(lpSlice) = -YYfinal(end,floor(end/2))*0.001*scaleY;
 
+  figure(27) % Overlay inferred mesh on image data
+  imagesc(imDat)
+  hold on
+    plot(XX+roiRect(1),YY+roiRect(2),'c');
+    plot(XX'+roiRect(1),YY'+roiRect(2),'c')
+    plot(XXfinal+roiRect(1), YYfinal+roiRect(2), 'r')
+    plot(XXfinal'+roiRect(1),YYfinal'+roiRect(2),'r')
+  hold off
 
 end
 
-% Display (smoothed) area strain at the end of some time-slice
-BB = arrayA(:,:,4)./arrayA(:,:,1); % area strain
+% % Display (smoothed) area strain at the end of some time-slice
+BB = arrayA(:,:,10)./arrayA(:,:,1); % area strain
 CC = imgaussfilt(BB-1, 1) +1; % slight smoothing - just for visualisation 
 figure(22)
-  imagesc(CC)
+  imagesc(BB)
   caxis([1 1.05])
 xlabel('X-position, grid points')
 ylabel('Y-position, grid points')
@@ -221,9 +275,10 @@ listWs = listW1s + listW2s;
 % listDzs = ones(size(listZs));
 listDzs = listZs(2:end) - listZs(1:(end-1));
 
+% From visual analysis:
 % Alternative: for 42 s to 62 s in sample data: inspect pixel posit of plt:
-% listZplate=[5,5,5,5,5,6,7,8,9.5,11,13,15,18,20,22.5,25,28,31,34,37]'*scaleY*0.001
-% listDzs = listZplate(2:end) - listZplate(1:(end-1))
+listZplate=[5,5,5,5,5,6,7,8,9.5,11,13,15,18,20,22.5,25,28,31,34,37]'*scaleY*0.001;
+listDzs = listZplate(2:end) - listZplate(1:(end-1));
 
 listFs = listWs./listDzs ; % at 1.2 mm / 5s
 
@@ -240,3 +295,5 @@ xlim([5 20])
 xlabel('time / seconds')
 ylabel('Force / N')
 set(gca, 'fontSize', 14)
+
+

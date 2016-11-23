@@ -43,7 +43,7 @@ addpath([pwd,'/tracking']);
 % 0. CONTROL PARAMETERS FOR THIS SCRIPT
 filenameMP4 = 'Nov_07_Exp_5_H130D45.MP4'; % Name of file to process
 
-thfrac = 0.25;  % Fractional value to set threshold for particle finding
+thfrac = 0.95;  % Fractional value to set threshold for particle finding
                 % Note 'median' might be more robust than 0.25*(max-bg)
 
 scaleX   = 30/108 ; % mm distance per horizontal pixel width
@@ -56,7 +56,9 @@ YXratio = scaleX/scaleY; % How many vertical pixel widths equal one
 % REGION OF INTEREST SELECTION
 flagROIauto = 0;  % Set to 1 to bypass manual roi selection
 roiBorder   = 50; % Width of border (pixels) where we will not try to interpolate displacement
-                
+
+flagShowAllTracks = 0;
+
 % PARTICLE IDENTIFICATION
 szPKFND = 11;    % Set to bigger than particle diameter.
 szCNTRD = 11;    % Diameter of window for centroid finding. Avoid other particles.
@@ -131,7 +133,8 @@ im2 = bpass(im1, 1, lobjectBPASS);
 %   title('Filtered region of interest')
 
 if lpIm == 1 % set threshold using data in frame 1
-  thresh = min(im2(:)) + thfrac*(max(im2(:)) - min(im2(:)));
+  % thresh = min(im2(:)) + thfrac*(max(im2(:)) - min(im2(:)));
+  thresh = quantile(im2(:), thfrac);
 end
 
 % APPLY JCC / DLB peak- and centroid-finding
@@ -156,10 +159,11 @@ end
 res = track(pos,maxdisp);
 
 % Plot all identified tracks
-figure(3)
-imagesc(imROI)
-colormap('gray')
-hold on
+if(flagShowAllTracks)
+ figure(3)
+ imagesc(imROI)
+ colormap('gray')
+ hold on
  for lpT = 1:res(end,4)
   resA = res(res(:,4)==lpT,:);
   plot(resA(:,1),resA(:,2) ,'r');
@@ -167,8 +171,8 @@ hold on
   scatter(resA(end,1), resA(end,2), 'r');
  end
  legend('track','start','end')
-hold off
-
+ hold off
+end
 
 %% 3. OUTPUT / VISUALISATION
 % --------------------------------------------
