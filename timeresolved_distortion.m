@@ -1,6 +1,12 @@
 % timeresolved_distortion
 % EJR 2016, CC-BY
 %
+% COMMENTS:
+% This is a development script.
+% It tries to infer area strain and parameters related to energy of uplift
+% At present, students should make a copy with material parameters tailored
+%   to a specific video data file.
+%
 % NOTES. This script:
 % 1. Post-processes particle tracking (velocimetry) results from
 % trackuplift_v2
@@ -8,6 +14,9 @@
 % 2. Generates a map showing final state of an initially-square grid
 %
 % 3. Also tries to calculate area strain at each (non-edge) vertex of mesh
+%  --- ACTUALLY: calculates area element properties using displacement 
+%      vectors from top left corner of each (initially square) rhomboid
+%      Could improve on this by adding in complementary vertex props
 %
 % 4. Then try to calculate potential energy for
 % -> gravitational potential (uplift)
@@ -41,7 +50,7 @@
 
 outName = 'D:\EJR_GIT\reverse_hopper\outVidM\mesh'; % File for output
 
-roiBorder = 8; % Unfortunately, strain is important at very grid bottom!
+roiBorder = 12.5; % Unfortunately, strain is important at very grid bottom!
 gridSpacing = 25;
 % gridSpacing = (roiRect(4)-2*roiBorder) /12; % Capture full vertical range
 
@@ -54,13 +63,18 @@ nSlices = 20;
 [XX,YY] = meshgrid([roiBorder:gridSpacing:(roiRect(3)-roiBorder)], ...
                    [roiBorder:gridSpacing:(roiRect(4)-roiBorder)]);
 
-% Array to store areas corresponding to non-boundary vertices in XX,YY
+% Array to store areas corresponding to non-edge vertices in XX,YY
 arrayA = zeros([size(XX)-1,nSlices]);
 
 % Array of hydrostatic pressures estimated at centre of each 'square'
+% -- Assumes bulk density is 1800 kg / m^3
 arrayPre = ( roiRect(2) - initialHeight + gridSpacing/2 + ...
             YY(1:(end-1),1:(end-1)) ).*scaleY*0.001*9.81*1800;
 
+% Arrays to store heights and widths of each area element, and shear angle
+arrayHeights = zeros([size(XX)-1,nSlices]);
+arrayWidths  = zeros([size(XX)-1,nSlices]);
+arrayShearAngle = zeros([size(XX)-1,nSlices]);
 
 % Array to store estimated gravitational and strain energies
 arrayGPE = zeros(size(arrayA)); % Let slice 1 = zero for each element
@@ -79,11 +93,11 @@ for lpSlice = 1:nSlices
 
   % Identify initial and displaced points from reliable tracks
   numTracks = (res(end,4));
-  posInit = -ones(numTracks,2);
+  posInit = -ones(numTracks,2); % Initialise 
   posDisp = -ones(numTracks,2);
   for lpTrack = 1:numTracks
     myCoords = res((res(:,4)==lpTrack),[1:4]);
-    if( ((sum(myCoords(:,3)==1))+ ...
+    if( ((sum(myCoords(:,3)==1))+ ... % If the particle is found throughout nSlices
          (sum(myCoords(:,3)==frameEnd)) + ...
          (sum(myCoords(:,3)==frameMax))) == 3 )
     posInit(lpTrack,:) = myCoords((myCoords(:,3)==1),1:2);
@@ -91,7 +105,7 @@ for lpSlice = 1:nSlices
     end
   end
   invalid = (posInit(:,1)==-1) | (posDisp(:,1)==-1);
-  posInit(invalid,:) = [];
+  posInit(invalid,:) = []; % Expunge records that were not validly found
   posDisp(invalid,:) = [];
   
   
@@ -148,6 +162,8 @@ for lpSlice = 1:nSlices
   % (a) Evaluate two current displacement vectors at each vertex, 
   %      for vectors that were initially 'right' and 'down' in start grid
   %      size = (rows, cols, 2) - add third direction (Dz = 0) for 'cross'
+	% vectH is the final (x,y) direction vector of a square edge that initially points to the 'right'
+	% vectV is the final (x,y) direction vector of a square edge that initially points 'down'
   vectH = -ones([size(XXfinal),3]); % Residual -ones should be ignored
   vectH(1:end,(1:end-1),1) = XXfinal(1:end,2:end)-XXfinal(1:end,(1:end-1));
   vectH(1:end,(1:end-1),2) = YYfinal(1:end,2:end)-YYfinal(1:end,(1:end-1));
@@ -159,7 +175,7 @@ for lpSlice = 1:nSlices
   vectV = -ones([size(YYfinal),3]);
   vectV(1:(end-1),1:end,1) = XXfinal(2:end,1:end)-XXfinal(1:(end-1),1:end);
   vectV(1:(end-1),1:end,2) = YYfinal(2:end,1:end)-YYfinal(1:(end-1),1:end);
-  vectV(:,:,3) = 0;
+  vectV(:,:,3) = 0; % Rel. displacement in z-direction is taken to be zero
   % Apply pixel width scale to get physical displacements
   vectV(:,:,1) = vectV(:,:,1)*scaleX;
   vectV(:,:,2) = vectV(:,:,2)*scaleY;
@@ -175,11 +191,23 @@ for lpSlice = 1:nSlices
 %                                         AA(1:(end-2),2:(end-1)    ) + ... 
 %                                         AA(2:(end-1),1:(end-2)) );
 %                                     % 0.25 gets area nearest each vertex?
-  if(lpSlice ==1)
+	% STORE values of area array:
+	if(lpSlice ==1)
     matrAreaInit = matrArea;
   end
   arrayA(:,:,lpSlice) = matrArea(1:(end-1), 1:(end-1));
-  
+  % STORE values of height array and width array.
+	arrayHeights(:,:,lpSlice) = abs(vectV(1:(end-1), 1:(end-1),2));
+	arrayWidths(:,:,lpSlice)  = abs(vectH(1:(end-1), 1:(end-1),1));
+	
+	cropVectH = vectH(1:(end-1), 1:(end-1),:);
+	cropVectV = vectV(1:(end-1), 1:(end-1),:);
+	lengthCropVectH = sqrt(cropVectH(:,:,1).^2 + cropVectH(:,:,2).^2 );
+	lengthCropVectV = sqrt(cropVectV(:,:,1).^2 + cropVectV(:,:,2).^2 );
+  arrayShearAngle(:,:,lpSlice) = acos( dot(cropVectH,cropVectV,3) ./ ...
+		                                  (lengthCropVectH.*lengthCropVectV) );
+	
+	
   figure(21)
   % imagesc(matrArea(2:(end-1),2:(end-1)))
   imagesc(matrArea(2:(end-1),2:(end-1))./matrAreaInit(2:(end-1),2:(end-1)))
@@ -296,4 +324,106 @@ xlabel('time / seconds')
 ylabel('Force / N')
 set(gca, 'fontSize', 14)
 
+figure(28)
+imagesc(arrayAR)
+colorbar
+title('Aspect ratio (i.e. height/width at 15 s)');
+xlabel('x position / arb')
+ylabel('y position / arb')
+set(gca, 'fontSize', 12)
+caxis([0.97 1.03])
+
+figure(29)
+arrayAR = ( arrayHeights(:,:,15)./arrayHeights(:,:,1) ) ./ ...
+	        ( arrayWidths(:,:,15)./arrayWidths(:,:,1) );
+subplot(1,3,1)
+imagesc(arrayAR<0.98)
+xlabel('x position / arb')
+ylabel('y position / arb')
+title(' Yellow="Active": height/width < 0.98')
+set(gca, 'fontSize', 12)
+
+subplot(1,3,2)
+imagesc(arrayAR<1.01 & arrayAR > 0.99)
+xlabel('x position / arb')
+ylabel('y position / arb')
+title(' Yellow: 0.99 < height/width < 1.01')
+set(gca, 'fontSize', 12)
+
+subplot(1,3,3)
+imagesc(arrayAR>1.02)
+xlabel('x position / arb')
+ylabel('y position / arb')
+title(' Yellow="Passive":  height/width > 1.02')
+set(gca, 'fontSize', 12)
+
+figure(30)
+arrayShear = arrayShearAngle(:,:,15) - pi/2;
+imagesc( abs(arrayShear*(180/pi)) )
+colorbar
+title(' Magnitude of shear angle, degrees')
+xlabel('x position / arb')
+ylabel('y position / arb')
+set(gca, 'fontSize', 12)
+
+
+BB = arrayA(:,:,15)./arrayA(:,:,1); % area strain
+CC = imgaussfilt(BB-1, 1) +1; % slight smoothing - just for visualisation 
+figure(31)
+  imagesc(CC)
+  % caxis([1.00 1.05])
+xlabel('X-position, grid points')
+ylabel('Y-position, grid points')
+set(gca, 'fontSize', 14)
+colorbar
+title('(Smoothed) area strain... dilation in shear zone')
+
+figure(32)
+scatter( abs(arrayShear(:)*(180/pi)) , CC(:))
+xlabel('Shear strain, degrees')
+ylabel('Area ratio (area strain = ratio - 1)')
+title(' Magnitude of shear angle, degrees')
+set(gca, 'fontSize', 14)
+set(gca, 'fontSize', 12)
+
+% How does the relation of shear angle: area (or volume) strain develop?
+figure (33)
+subplot(1,3,1)
+scatter(  reshape(abs( (arrayShearAngle(:,:,10)-pi/2)*(180/pi)),1,[]) , ... 
+	       reshape((arrayA(:,:,10)./arrayA(:,:,1)),1,[]) , 'rx' )
+xlabel('Shear strain, degrees')
+ylabel('Area ratio (area strain = ratio - 1)')
+xlim([0 20])
+ylim([0.95, 1.1])
+title('time = 10 s')
+hold on
+ xx = 0:1:20;
+ plot(xx, 1+0.05*(1-exp(-xx./10)), 'k')
+hold off
+
+subplot(1,3,2)
+scatter(  reshape(abs( (arrayShearAngle(:,:,15)-pi/2)*(180/pi)),1,[]) , ... 
+	       reshape((arrayA(:,:,15)./arrayA(:,:,1)),1,[]) , 'bx' )
+xlabel('Shear strain, degrees')
+ylabel('Area ratio (area strain = ratio - 1)')
+xlim([0 20])
+ylim([0.95, 1.1])
+title('time = 15 s, approx peak force')
+hold on
+ xx = 0:1:20;
+ plot(xx, 1+0.05*(1-exp(-xx./10)), 'r')
+hold off
+
+subplot(1,3,3)
+scatter(  reshape(abs( (arrayShearAngle(:,:,20)-pi/2)*(180/pi)),1,[]) , ... 
+	       reshape((arrayA(:,:,20)./arrayA(:,:,1)),1,[]) , 'kx' )
+xlabel('Shear strain, degrees')
+ylabel('Area ratio (area strain = ratio - 1)')
+xlim([0 20])
+ylim([0.95, 1.1])
+title('time = 20 s')
+hold on
+ xx = 0:1:20;
+ plot(xx, 1+0.05*(1-exp(-xx./10)), 'r')
+hold off
 

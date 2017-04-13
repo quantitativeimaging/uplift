@@ -47,9 +47,14 @@ for lp = 1:nSteps
 	listL(lp) = L;
 	L = L+k*zStep;
 	
+	xxx = 0.01:0.01:1; % Let x / xN be xxx. xN is L here.
+	yyy = eM*(1 - exp(-sin(pi.*xxx)*(zp.*pi)./(2*L*gam0)) );
+	eV = sum(yyy)*0.01;
+	
 	Zn = H - (lp-1)*zStep; % depth of strip base
 	enGPE = zp*L/2;        % estimate gravitational internal energy added
-	enPDV = Zn*L*eM*(1 - (6.209/pi)*exp(-(zp*pi)/(2*L*gam0) ) );
+	% enPDV = Zn*L*eM*(1 - (6.209/pi)*exp(-(zp*pi)/(2*L*gam0) ) );
+	enPDV = Zn*L*eV;
 	enSHR = (1/16)*K*Zn*pi^2*zp^2/L;
 	
 	listU(lp) = enGPE + enPDV + enSHR;
@@ -99,10 +104,15 @@ for lp = 1:nSteps
 	listL(lp) = L;
 	L = L+k*zStep;
 	
+	xxx = 0.01:0.01:1; % Let x / xN be xxx. xN is L here. Numerical integral:
+	yyy = eM*(1 - exp(-sin(pi.*xxx)*(zp.*pi)./(2*L*gam0)) );
+	eV = sum(yyy)*0.01;
+	
 	Zn = H - (lp-1)*zStep; % depth of strip base
 	enGPE = zp*L/2;        % estimate gravitational internal energy added
-	enPDV = Zn*L*eM*(1 - (6.209/pi)*exp(-(zp*pi)/(2*L*gam0) ) );
+	% enPDV = Zn*L*eM*(1 - (6.209/pi)*exp(-(zp*pi)/(2*L*gam0) ) );
 	enSHR = (1/16)*K*Zn*pi^2*zp^2/L;
+	enPDV = Zn*L*eV;
 	
 	listU(lp) = enGPE + enPDV + enSHR;
 end
@@ -153,71 +163,67 @@ set(gca, 'fontSize', 12)
 %  Note that the real peak force may be limited by void collapse which 
 % isn't included in this model - could be introduced as a cut-off. 
 
-nZs = 20;
+nZs = 60;
+dZplate = 0.2; % plate movement
+
+listZplate = dZplate:dZplate:(nZs)*dZplate;
 Uz = zeros(nZs,1);
+
+listL0sOptimal = zeros(nZs, 1);
 figure(1)
 
 for lp3 = 1:nZs
-zp = lp3;
+zp = listZplate(lp3);
 
-nLs = 20;
+nLs = 100;
 listsL = zeros(nSteps, nLs);
 listsUT = zeros(nLs,1);
 
-% LOOP -> loop
-for lp2 = 1:nLs;
-L0 = listL0s(lp2)  % mm
-zStep = 1;         % mm
-% nSteps = 30; 
+listL0s = (0.5:1*0.5:((nLs)*0.5))';
 
-eM = 0.05; 
+	% LOOP -> loop
+	% Which curve in family has minimum energy for this plate position?
+	for lp2 = 1:nLs;
+	L0 = listL0s(lp2);  % mm
+	zStep = 1;         % mm
+	% nSteps = 30; 
+	eM = 0.05; 
+	% zp = 4; % mm
+	gam0 = 0.12; % radians
 
-% zp = 4; % mm
-gam0 = 0.12; % radians
+	listL = zeros(nSteps,1);
+	L = L0;
 
-listL = zeros(nSteps,1);
-L = L0;
+		% What is the shape and energy of this curve?
+		for lp = 1:nSteps
+			k = L* eM*(1 - (6.209/(pi))*exp(-(zp*pi)/(2*L*gam0)) ) * (zStep*2/zp);
 
-for lp = 1:nSteps
-	k = L* eM*(1 - (6.209/pi)*exp(-(zp*pi)/(2*L*gam0)) ) * (zStep*2/zp);
+			listL(lp) = L;
+			L = L+k*zStep;
+
+			Zn = H - (lp-1)*zStep; % depth of strip base
+			enGPE = zp*L/2;        % estimate gravitational internal energy added
+			enPDV = Zn*L*eM*(1 - (6.209/(1*pi))*exp(-(zp*pi)/(2*L*gam0) ) );
+			enSHR = (1/16)*K*Zn*pi^2*zp^2/L;
+
+			listU(lp) = enGPE + enPDV + enSHR;
+		end
+
+	listsL(:,lp2) = listL;
+	listsUT(lp2)  = sum(listU);
+	% figure(1)
+	% hold on
+	% plot(listL, 1:nSteps)
+	end
 	
-	listL(lp) = L;
-	L = L+k*zStep;
-	
-	Zn = H - (lp-1)*zStep; % depth of strip base
-	enGPE = zp*L/2;        % estimate gravitational internal energy added
-	enPDV = Zn*L*eM*(1 - (6.209/pi)*exp(-(zp*pi)/(2*L*gam0) ) );
-	enSHR = (1/16)*K*Zn*pi^2*zp^2/L;
-	
-	listU(lp) = enGPE + enPDV + enSHR;
-end
-% for lp = 1:nSteps
-% 	k = L* eM*(1 - (6.209/pi)*exp(-(zp*pi)/(2*L*gam0)) ); %  * (2/zp);
-% 	
-% 	listL(lp) = L;
-% 	L = L+k*zStep;
-% 	
-% 	
-% 	Zn = H - (lp-1); % depth of strip base
-% 	enGPE = zp*L/2;
-% 	enPDV = Zn*L*eM*(1 - (6.209/pi)*exp(-(zp*pi)/(2*L*gam0) ) );
-% 	enSHR = (1/16)*K*Zn*pi^2*zp^2/L;
-% 	
-% 	listU(lp) = enGPE + enPDV + enSHR;
-% end
-
-listsL(:,lp2) = listL;
-listsUT(lp2)  = sum(listU);
-% figure(1)
-% hold on
-% plot(listL, 1:nSteps)
-end
-
 Uz(lp3) = min(listsUT);
+
+thisL0 = listsL(1, listsUT == min(listsUT));
+listL0sOptimal(lp3) = thisL0
 end
 
 figure(3)
-plot(Uz)
+plot(listZplate,Uz)
 title('sand internal energy')
 xlabel('z plate ')
 ylabel('internal energy / very arb units')
@@ -230,84 +236,37 @@ ylabel('internal energy / very arb units')
 % say column half width = 20 mm, H = 100 mm
 wColumn = 100*40;
 
-delU = Uz(2:end) - Uz(1:(end-1));
+delU = ( Uz(2:end) - Uz(1:(end-1)) ) /dZplate; % plate movement 0.5
 figure(4)
-plot(delU + wColumn)
-title('energy change with plate step')
-xlabel('z plate ')
-ylabel('force (very roughly) / arb')
-% ylim([0 7000])
-
-
-%%
-nZs = 20;
-Uz = zeros(nZs,1);
-figure(1)
-
-for lp3 = 1:nZs
-zp = lp3;
-
-nLs = 20;
-listsL = zeros(nSteps, nLs);
-listsUT = zeros(nLs,1);
-% close(1)
-
-for lp2 = 1:nLs;
-L0 = lp2*2; % mm
-zStep = 1; % mm
-nSteps = 30;
-
-eM = 0.05; 
-
-% zp = 5; % mm
-gam0 = 0.12; % radians
-
-listL = zeros(nSteps,1);
-L = L0;
-for lp = 1:nSteps
-	k = L* eM*(1 - (6.209/pi)*exp(-(zp*pi)/(2*L*gam0)) ); %  * (2/zp);
-	
-	listL(lp) = L;
-	L = L+k*zStep;
-	
-	
-	Zn = max( H - (lp-1) - zp ,  0); % depth of strip base. ASSUME TOP CLEARs
-	enGPE = zp*L/2;
-	enPDV = Zn*L*eM*(1 - (6.209/pi)*exp(-(zp*pi)/(2*L*gam0) ) );
-	enSHR = (1/16)*K*Zn*pi^2*zp^2/L;
-	
-	listU(lp) = enGPE + enPDV + enSHR;
-end
-
-listsL(:,lp2) = listL;
-listsUT(lp2)  = sum(listU);
-figure(1)
+plot(listZplate(2:end), delU + wColumn)
 hold on
-plot(listL, 1:nSteps)
-end
+ plot([0,20], [wColumn, wColumn], '--r')
+hold off
+title('Force implied by energy change, neglecting void collapse')
+xlabel('Plate z-position / mm ')
+ylabel('Force (very roughly) / arb')
+ylim([0 16000])
+xlim([0 12])
+set(gca, 'fontSize', 12)
+legend('implied force', 'column weight')
 
-Uz(lp3) = min(listsUT);
+figure(5)
+plot(listZplate, listL0sOptimal)
 
-end
+%% ROUGH WORK
+% Problems with mean volumetric expansion term:
 
-figure(3)
-plot(Uz)
-title('sand internal energy')
-xlabel('z plate ')
-ylabel('internal energy / very arb units')
+zp = 0.1:0.1:24;
+eV = eM*( 1 - (6.209/(1*pi)).*exp(-(zp.*pi)./(2*L*gam0) ) );
 
-% calculate column weight in same arb units to estimate breakout factor
-% GPE of one strip (H strips) = zp * L/2 in arb units. Both L, zp in mm. 
-% wColumn = W_real / (rho g L delH?)
-% wColumn = H*(D/2)
-% wColumn*zp = H*D/2*zp
-% say column half width = 20 mm, H = 100 mm
-wColumn = 100*40;
+figure(6)
+plot(zp, eV)
 
-delU = Uz(2:end) - Uz(1:(end-1));
-figure(4)
-plot(delU)
-title('energy change with plate step')
-xlabel('z plate ')
-ylabel('force (very roughly) / arb')
-% ylim([0 7000])
+xx = 0:0.001:(pi);
+yy = exp(sin(xx));
+sum(yy)*0.001
+
+ZP = 0.1;
+xxx = 0.01:0.01:1;
+yyy = eM*(1 - exp(-sin(pi.*xxx / 1)*(ZP.*pi)./(2*L*gam0)) );
+I = sum(yyy)*0.01
