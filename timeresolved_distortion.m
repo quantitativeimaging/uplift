@@ -325,6 +325,8 @@ ylabel('Force / N')
 set(gca, 'fontSize', 14)
 
 figure(28)
+arrayAR = ( arrayHeights(:,:,15)./arrayHeights(:,:,1) ) ./ ...
+	        ( arrayWidths(:,:,15)./arrayWidths(:,:,1) );
 imagesc(arrayAR)
 colorbar
 title('Aspect ratio (i.e. height/width at 15 s)');
@@ -334,8 +336,6 @@ set(gca, 'fontSize', 12)
 caxis([0.97 1.03])
 
 figure(29)
-arrayAR = ( arrayHeights(:,:,15)./arrayHeights(:,:,1) ) ./ ...
-	        ( arrayWidths(:,:,15)./arrayWidths(:,:,1) );
 subplot(1,3,1)
 imagesc(arrayAR<0.98)
 xlabel('x position / arb')
