@@ -43,6 +43,9 @@ addpath([pwd,'/tracking']);
 % 0. CONTROL PARAMETERS FOR THIS SCRIPT
 filenameMP4 = 'Nov_07_Exp_5_H130D45.MP4'; % Name of file to process
 
+[filename, pathname] = uigetfile({'*.mp4'},'Select input MP4',filenameMP4);
+filenameMP4 = [pathname,filename];
+
 thfrac = 0.95;  % Fractional value to set threshold for particle finding
                 % Note 'median' might be more robust than 0.25*(max-bg)
 
@@ -71,10 +74,20 @@ radgauss = 20;  % Std deviation value for background subtraction
 maxdisp = 4;    % Maximum particle displacement per frame 
                 % (distance is in pixel widths - somewhat wrongly assumed identical in X and Y) 
 
-% PARTICLE TRACK ANALYSIS
+% PARTICLE TRACK ANALYSIS - set default and confirm in dialog box
 tInit   = 42;   % Timestamp in MP4 data (seconds) for first frame to analyse
 tStep   = 1;    % Time step to get next frame to evaluate particle position
-nSteps  = 40;   % Number of steps to consider 
+nSteps  = 10;   % Number of steps to consider 
+
+prompt = {'time start (s)','time increment (s)','number of time steps'};
+dlg_title = 'Please confirm time range for analysis';
+num_lines = 1;
+defaultans = { num2str(tInit),num2str(tStep),num2str(nSteps) };
+answer = inputdlg(prompt,dlg_title,num_lines,defaultans);
+tInit   = str2num(answer{1});
+tStep   = str2num(answer{2});
+nSteps  = str2num(answer{3});
+
 
 % MOVEMENT / STATIC region analysis
 threshMove = 0.025*nSteps; % Threshold for identifying movement. 

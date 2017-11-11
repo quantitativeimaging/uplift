@@ -63,9 +63,10 @@ for lpImDat =1:nSteps % For the required number of frames of MP4 data
 v.CurrentTime = tInit + (lpImDat-1)*tStep;  % Find  desired timepoint
 imDat     = readFrame(v);                   % Read this frame
 imDatGray = mean(imDat, 3) - imDatGrayMean;
+imDatGrayFrac = imDatGray ./ imDatGrayMean;
 
-imDatGraySumMBG        = imDatGraySumMBG + imDatGray;
-imDatGraySumSquaresMBG = imDatGraySumSquaresMBG + imDatGray.^2;
+imDatGraySumMBG        = imDatGraySumMBG + imDatGrayFrac;
+imDatGraySumSquaresMBG = imDatGraySumSquaresMBG + imDatGrayFrac.^2;
 
 end
 
@@ -77,4 +78,8 @@ end
 figure(1)
 imagesc(imDatGraySumSquaresMBG)
 colorbar
+
+foo = min (imDatGraySumSquaresMBG(:))
+caxis([foo, foo*1.05])
+
 
