@@ -77,22 +77,24 @@ maxdisp = 4;    % Maximum particle displacement per frame
 % PARTICLE TRACK ANALYSIS - set default and confirm in dialog box
 tInit   = 42;   % Timestamp in MP4 data (seconds) for first frame to analyse
 tStep   = 1;    % Time step to get next frame to evaluate particle position
-nSteps  = 10;   % Number of steps to consider 
-
-prompt = {'time start (s)','time increment (s)','number of time steps'};
-dlg_title = 'Please confirm time range for analysis';
-num_lines = 1;
-defaultans = { num2str(tInit),num2str(tStep),num2str(nSteps) };
-answer = inputdlg(prompt,dlg_title,num_lines,defaultans);
-tInit   = str2num(answer{1});
-tStep   = str2num(answer{2});
-nSteps  = str2num(answer{3});
-
+nSteps  = 20;   % Number of steps to consider 
 
 % MOVEMENT / STATIC region analysis
 threshMove = 0.025*nSteps; % Threshold for identifying movement. 
                   % Is applied to dispacements in millimetres 
                   % Seems sensible to define as (speed X nSteps)
+
+% CREATE DIALOG BOX FOR USER TO CONFIRM SOME PROCESSING PARAMETERS
+prompt = {'time start (s)','time increment (s)','number of time steps', 'displacement visualisation threshold (mm)'};
+dlg_title = 'Please confirm time range for analysis';
+num_lines = 1;
+defaultans = { num2str(tInit),num2str(tStep),num2str(nSteps), num2str(threshMove) };
+answer     = inputdlg(prompt,dlg_title,num_lines,defaultans);
+tInit      = str2num(answer{1});
+tStep      = str2num(answer{2});
+nSteps     = str2num(answer{3});
+threshMove = str2num(answer{4});
+
 
 % 1. INPUT
 

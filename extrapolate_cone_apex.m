@@ -22,6 +22,21 @@
 %     atan( (D / 2) /Y_A )  (radians)
 %     atan( (D / 2) /Y_A ) * 180/pi
 
+% GET A LIST OF ACCEPTABLE y-ranges where movement is usable:
+y_allowed_top = 225;
+y_allowed_bot = 575;
+displacement_threshold = 4;
+
+prompt = {'y_allowed_top, pixels','y_allowed_bottom, pixels', 'displacement_threshold / mm'};
+dlg_title = 'Please confirm parameters for analysis';
+num_lines = 1;
+defaultans = { num2str(y_allowed_top),num2str(y_allowed_bot), num2str(displacement_threshold)  };
+answer     = inputdlg(prompt,dlg_title,num_lines,defaultans);
+y_allowed_top          = str2num(answer{1});
+y_allowed_bot          = str2num(answer{2});
+displacement_threshold = str2num(answer{3});
+
+
 % The following code plots interpolated positions
 [XX,YY] = meshgrid([roiBorder:25:(roiRect(3)-roiBorder)], ...
                    [roiBorder:25:(roiRect(4)-roiBorder)]);
@@ -52,8 +67,8 @@ ylabel('Y-position, pixels')
 set(gca, 'fontSize', 14)
 
 % Find points with significant movement (threshold of one pixel moved).
-listMoved = listDisps > 2;
-listGood = listMoved & (listYinit > 225) & (listYinit < 575);
+listMoved = listDisps > displacement_threshold;
+listGood = listMoved & (listYinit > y_allowed_top) & (listYinit < y_allowed_bot);
 numberMoved = sum(listGood);
 
 % 
@@ -135,6 +150,10 @@ hold on
 	scatter(xI(listVeryGood==0), yI(listVeryGood==0),'gx')
 hold off
 ylim([0 apex_position(2)*1.1])
+
+% Write x-y coordinates of apex in image (frame) values (not cropped)
+apex_frame_coords_x = apex_position(1) + roiRect(1)
+apex_frame_coords_y = apex_position(2) + roiRect(2)
 
 % Plot initial and final positions
 figure(12)
