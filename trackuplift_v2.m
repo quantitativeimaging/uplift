@@ -56,6 +56,8 @@ YXratio = scaleX/scaleY; % How many vertical pixel widths equal one
                 % horizontal width. Should be 1.00 if camera axis
                 % horizontal, but in practice it may vary! Calibrate. 
 
+flag_contours = 1;
+
 % REGION OF INTEREST SELECTION
 flagROIauto = 0;  % Set to 1 to bypass manual roi selection
 roiBorder   = 50; % Width of border (pixels) where we will not try to interpolate displacement
@@ -85,15 +87,19 @@ threshMove = 0.025*nSteps; % Threshold for identifying movement.
                   % Seems sensible to define as (speed X nSteps)
 
 % CREATE DIALOG BOX FOR USER TO CONFIRM SOME PROCESSING PARAMETERS
-prompt = {'time start (s)','time increment (s)','number of time steps', 'displacement visualisation threshold (mm)'};
+prompt = {'time start (s)','time increment (s)','number of time steps', ...
+	        'displacement visualisation threshold (mm)',...
+					'Show contours? ( 1 = yes)'};
 dlg_title = 'Please confirm time range for analysis';
 num_lines = 1;
-defaultans = { num2str(tInit),num2str(tStep),num2str(nSteps), num2str(threshMove) };
+defaultans = { num2str(tInit),num2str(tStep),num2str(nSteps), ... 
+	             num2str(threshMove), num2str(flag_contours) };
 answer     = inputdlg(prompt,dlg_title,num_lines,defaultans);
 tInit      = str2num(answer{1});
 tStep      = str2num(answer{2});
 nSteps     = str2num(answer{3});
 threshMove = str2num(answer{4});
+flag_contours = str2num(answer{5});
 
 
 % 1. INPUT
@@ -317,8 +323,43 @@ imOverlay( roiRect(2)-0+[roiBorder:1:(roiRect(4)-roiBorder)], ...
     0.5*imOverlay( roiRect(2)-0+[roiBorder:1:(roiRect(4)-roiBorder)], ...
                    roiRect(1)-0+[roiBorder:1:(roiRect(3)-roiBorder)],2)+...
     0.5*double(maskSlip);
+
 figure(16)
 imagesc(imOverlay)
+if(flag_contours) % If contours should be added to the plot
+	spacing = 100;
+	
+  XX_final_subset = reshape(listXfinal, size(XX));
+	YY_final_subset = reshape(listYfinal, size(YY));
+  
+	XX_final_subset = XX_final_subset(100:spacing:end, :);
+	YY_final_subset = YY_final_subset(100:spacing:end, :);
+
+	XX_init_subset = XX(100:spacing:end, :);
+	YY_init_subset = YY(100:spacing:end, :);
+	
+	x_pos = (1:size(imDat,2) )*scaleX; % image positions in mm...
+	y_pos = (1:size(imDat,1))*scaleY;
+	
+	figure(17)
+	imagesc(x_pos, y_pos, imOverlay)
+	hold on
+	for lp = 1:size(XX_final_subset ,1);
+		plot( scaleX*(XX_init_subset(lp,:) + roiRect(1)), scaleY*(YY_init_subset(lp,:)+roiRect(2)), 'k', 'lineWidth', 2 );	
+		plot( scaleX*(XX_final_subset(lp,:) + roiRect(1)), scaleY*(YY_final_subset(lp,:)+roiRect(2)), 'r', 'lineWidth', 2  );	
+	end
+	hold off
+	axis image
+	xlim([100 250])
+	ylim([100 220]) % Set these appropriately - units / mm
+	set(gca,'fontSize', 14);
+	xlabel('x-position / mm')
+	ylabel('y-position / mm')
+	%set(gca,'YTickLabel',[]);
+	%set(gca,'XTickLabel',[]);
+	% legend('initial position', 'final position')
+
+end
 
 % NEED TO FIX PROFILE PLOTS:
 % figure(17)
